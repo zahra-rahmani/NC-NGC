@@ -4,12 +4,9 @@ from peft import PeftModel
 from tqdm import tqdm
 import editdistance
 
-MODEL_DIR = "./llama_noeln_lora"   # fine-tuned model folder
+MODEL_DIR = "./llama_noeln_lora"   
 MAX_INPUT_TOKENS = 1024
 
-# --------------------------
-# Prompt builder (same as train)
-# --------------------------
 INSTR_HEADER = (
     "You are a transcription error correction assistant and linguistics expert, "
     "specializing in improving transcriptions produced by Automatic Speech Recognition (ASR) systems for noisy speeches. "
@@ -28,9 +25,7 @@ def build_prompt(hypotheses):
     return s
 
 
-# --------------------------
-# Load Model
-# --------------------------
+
 def load_model():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, use_fast=False)
     tokenizer.pad_token = tokenizer.eos_token
@@ -41,7 +36,6 @@ def load_model():
         torch_dtype=torch.float16,
     )
 
-    # attach LoRA adapters if saved separately
     if os.path.exists(os.path.join(MODEL_DIR, "adapter_config.json")):
         model = PeftModel.from_pretrained(model, MODEL_DIR)
 
@@ -49,17 +43,12 @@ def load_model():
     return model, tokenizer
 
 
-# --------------------------
-# WER
-# --------------------------
+
 def wer(ref, hyp):
     r, h = ref.split(), hyp.split()
     return editdistance.eval(r, h) / max(1, len(r))
 
 
-# --------------------------
-# Evaluation
-# --------------------------
 def evaluate(test_json, output_file="eval_outputs.jsonl"):
     model, tok = load_model()
 
@@ -83,7 +72,6 @@ def evaluate(test_json, output_file="eval_outputs.jsonl"):
             )
 
         gen_text = tok.decode(gen_ids[0], skip_special_tokens=True)
-        # Extract only after "=>Correct Transcription:"
         if "=>Correct Transcription:" in gen_text:
             gen_text = gen_text.split("=>Correct Transcription:")[-1].strip()
 
