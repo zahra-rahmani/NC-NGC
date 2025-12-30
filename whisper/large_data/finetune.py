@@ -10,10 +10,8 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import PreTrainedModel
 
 
-# --------------------------
 # Configurable params
-# --------------------------
-MODEL_NAME = "meta-llama/Llama-2-7b-hf"   # gated; switch if needed
+MODEL_NAME = "meta-llama/Llama-2-7b-hf"   
 MAX_INPUT_TOKENS = 1024
 PREFIX_TOKENS = 8
 LR = 2e-4
@@ -39,9 +37,7 @@ def build_prompt(hypotheses: List[str]) -> str:
     s += "=>Correct Transcription:"
     return s
 
-# --------------------------
 # Dataset (PT version)
-# --------------------------
 class ASRPtDataset(Dataset):
     def __init__(self, path: str, tokenizer: AutoTokenizer):
         super().__init__()
@@ -113,11 +109,9 @@ class DataCollatorPad:
         }
 
 
-# --------------------------
 # Model wrapper: ELN → prefix embeddings
-# --------------------------
 class ModelWithELNPrefix(PreTrainedModel):
-    config_class = None  # optional; can reuse base.config if needed
+    config_class = None  
 
     def __init__(self, base_model: AutoModelForCausalLM, tokenizer, eln_dim: int, prefix_tokens: int):
         super().__init__(base_model.config)
@@ -133,7 +127,6 @@ class ModelWithELNPrefix(PreTrainedModel):
         )
 
     def forward(self, input_ids=None, attention_mask=None, labels_text=None, eln=None, **kwargs):
-        # same forward logic as before ...
         text_embeds = self.base.get_input_embeddings()(input_ids)
         B = input_ids.shape[0]
         proj = self.eln_proj(eln)
@@ -169,28 +162,28 @@ class ModelWithELNPrefix(PreTrainedModel):
 
         device = next(self.parameters()).device
 
-        # --- 1. Check ELN vector shape ---
+        # Check ELN vector shape
         eln_vec = torch.tensor(eln_vec, dtype=torch.float32, device=device)
         if eln_vec.shape[-1] != self.eln_dim:
             raise ValueError(f"ELN dim mismatch: got {eln_vec.shape[-1]}, expected {self.eln_dim}")
 
-        # --- 2. Tokenize prompt ---
+        # Tokenize prompt 
         enc = self.tok(prompt_text, return_tensors="pt", add_special_tokens=False).to(device)
         text_embeds = self.base.get_input_embeddings()(enc["input_ids"])
         B = text_embeds.shape[0]
 
-        # --- 3. Project ELN into prefix embeddings ---
+        # Project ELN into prefix embeddings 
         proj = self.eln_proj(eln_vec.unsqueeze(0))                   # [1, K*H]
         prefix_embeds = proj.view(1, self.prefix_tokens, -1)         # [1, K, H]
 
-        # --- 4. Concat prefix + text embeddings ---
+        # Concat prefix + text embeddings
         inputs_embeds = torch.cat([prefix_embeds, text_embeds], dim=1)
         full_mask = torch.cat(
             [torch.ones(B, self.prefix_tokens, device=device, dtype=enc["attention_mask"].dtype), enc["attention_mask"]],
             dim=1
         )
 
-        # --- 5. Run generation ---
+        # Run generation 
         gen_ids = self.base.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=full_mask,
@@ -202,8 +195,6 @@ class ModelWithELNPrefix(PreTrainedModel):
             pad_token_id=self.tok.eos_token_id
         )
 
-        # --- 6. Slice only the generated continuation ---
-        # HF sometimes includes the whole prefix; sometimes only new tokens.
         gen_len = gen_ids.shape[1]
         prompt_len = enc["input_ids"].shape[1] + self.prefix_tokens
         if gen_len > prompt_len:
@@ -241,11 +232,8 @@ def wrap_with_lora(model):
     model = get_peft_model(model, lora)
     return model
 
-# --------------------------
 # Training entry
-# --------------------------
 def main_train(train_path: str):
-    # Infer ELN dim from first record
     first = torch.load(train_path)[0]
     eln_dim = len(first["eln"])
 
