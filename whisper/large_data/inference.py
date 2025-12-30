@@ -9,9 +9,6 @@ import editdistance
 import torch.nn as nn
 from transformers import PreTrainedModel
 
-# --------------------------
-# Instruction header
-# --------------------------
 INSTR_HEADER = (
     "You are a transcription error correction assistant and linguistics expert, "
     "specializing in improving transcriptions produced by Automatic Speech Recognition (ASR) systems for noisy speeches. "
@@ -30,9 +27,7 @@ def build_prompt(hypotheses: List[str]) -> str:
     s += "=>Correct Transcription:"
     return s
 
-# --------------------------
-# Model wrapper
-# --------------------------
+
 class ModelWithELNPrefix(PreTrainedModel):
     config_class = None
 
@@ -53,7 +48,7 @@ class ModelWithELNPrefix(PreTrainedModel):
         text_embeds = self.base.get_input_embeddings()(input_ids)
         B = input_ids.shape[0]
 
-        # ensure ELN and eln_proj are on same device and dtype
+
         dtype = text_embeds.dtype
         device = text_embeds.device
         eln = eln.to(device=device, dtype=dtype)
@@ -93,29 +88,23 @@ class ModelWithELNPrefix(PreTrainedModel):
         device = next(self.parameters()).device
         dtype = next(self.parameters()).dtype
 
-        # move ELN vector to correct device & dtype
         eln_vec = eln_vec.clone().detach().to(device=device, dtype=dtype)
 
-        # move ELN projection to correct device & dtype
         self.eln_proj = self.eln_proj.to(device=device, dtype=dtype)
 
-        # --- tokenize prompt ---
         enc = self.tok(prompt_text, return_tensors="pt", add_special_tokens=False).to(device)
         text_embeds = self.base.get_input_embeddings()(enc["input_ids"])
         B = text_embeds.shape[0]
 
-        # --- project ELN ---
         proj = self.eln_proj(eln_vec.unsqueeze(0))                   # [1, K*H]
         prefix_embeds = proj.view(1, self.prefix_tokens, -1)         # [1, K, H]
 
-        # --- concat prefix + text embeddings ---
         inputs_embeds = torch.cat([prefix_embeds, text_embeds], dim=1)
         full_mask = torch.cat(
             [torch.ones(B, self.prefix_tokens, device=device, dtype=enc["attention_mask"].dtype), enc["attention_mask"]],
             dim=1
         )
 
-        # --- generate ---
         gen_ids = self.base.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=full_mask,
@@ -127,7 +116,6 @@ class ModelWithELNPrefix(PreTrainedModel):
             pad_token_id=self.tok.eos_token_id
         )
 
-        # --- slice only the generated continuation ---
         gen_len = gen_ids.shape[1]
         prompt_len = enc["input_ids"].shape[1] + self.prefix_tokens
         continuation_ids = gen_ids[0][prompt_len:] if gen_len > prompt_len else gen_ids[0]
@@ -135,9 +123,6 @@ class ModelWithELNPrefix(PreTrainedModel):
         return self.tok.decode(continuation_ids, skip_special_tokens=True)
 
 
-# --------------------------
-# Dataset
-# --------------------------
 class ASRPtDataset(Dataset):
     def __init__(self, path: str):
         self.records = torch.load(path)   # list of dicts
@@ -150,16 +135,9 @@ class ASRPtDataset(Dataset):
         return self.records[idx]
 
 
-# --------------------------
-# WER utility
-# --------------------------
 def calculate_wer(pred: str, ref: str) -> float:
     return editdistance.eval(pred.split(), ref.split()) / max(1, len(ref.split()))
 
-
-# --------------------------
-# Load model
-# --------------------------
 def load_model(ckpt_dir: str, eln_dim: int, prefix_tokens: int):
     tok = AutoTokenizer.from_pretrained(ckpt_dir, use_fast=False)
     tok.pad_token = tok.eos_token
@@ -185,9 +163,6 @@ def load_model(ckpt_dir: str, eln_dim: int, prefix_tokens: int):
     return model, tok
 
 
-# --------------------------
-# Evaluation loop
-# --------------------------
 def main_eval(test_pt: str, ckpt_dir: str, prefix_tokens: int = 8, save_out: str = None):
     first = torch.load(test_pt)[0]
     eln_dim = len(first["eln"])
@@ -224,9 +199,7 @@ def main_eval(test_pt: str, ckpt_dir: str, prefix_tokens: int = 8, save_out: str
         print("Saved detailed outputs to", out_path)
 
 
-# --------------------------
-# CLI
-# --------------------------
+
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
