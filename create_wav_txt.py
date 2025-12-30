@@ -1,8 +1,8 @@
 # Configuration
 output_file = 'asr_wav.txt'
-audio_folder = '/home/zahra/hypo-light/generate_data/noisy_samples'
+audio_folder = 'path_to_noisy_samples'
 start_index = 0
-end_index = 28859  # audio_028859.wav corresponds to 28859
+end_index = 28859  
 
 # Generate the list
 with open(output_file, 'w') as f:
@@ -17,8 +17,8 @@ print(f'List generated and saved to {output_file}')
 
 import csv
 
-# Configuration
-input_csv = '/home/zahra/hypo-light/generate_data/transcriptions.csv'   # Path to your CSV file
+
+input_csv = 'path_to_transcriptions_csv'   
 output_txt = 'asr_txt.txt'
 
 # Processing
