@@ -6,7 +6,7 @@ import os
 import shutil
 import csv
 
-save_dir = "/home/zahra/hypo-light/generate_data/test_data"
+save_dir = "path_to_data"
 audio_dir = os.path.join(save_dir, "wavs")
 os.makedirs(audio_dir, exist_ok=True)
 
@@ -20,12 +20,9 @@ with open(csv_path, mode="w", newline="", encoding="utf-8") as file:
         audio_info = example["audio"]
         original_audio_path = audio_info["path"]
 
-        # Save new audio filename
         new_filename = f"audio_{i:06}.wav"
         new_audio_path = os.path.join(audio_dir, new_filename)
 
-        # Copy .wav to your desired directory
         shutil.copy(original_audio_path, new_audio_path)
 
-        # Save filename + transcription
         writer.writerow([new_filename, example["sentence"]])
