@@ -7,9 +7,7 @@ from transformers import (AutoModelForCausalLM, AutoTokenizer, Trainer, Training
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from tqdm import tqdm
 
-# --------------------------
-# Configurable params
-# --------------------------
+
 MODEL_NAME = "meta-llama/Llama-2-7b-hf"
 MAX_INPUT_TOKENS = 1024
 LR = 2e-4
@@ -35,9 +33,7 @@ def build_prompt(hypotheses: List[str]) -> str:
     return s
 
 
-# --------------------------
-# Dataset (from JSON file)
-# --------------------------
+
 class ASRJsonDataset(Dataset):
     def __init__(self, path: str, tokenizer: AutoTokenizer):
         super().__init__()
@@ -102,9 +98,6 @@ class DataCollatorPad:
         }
 
 
-# --------------------------
-# Load base + wrap with LoRA
-# --------------------------
 def load_base_model_and_tokenizer():
     tok = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=False)
     tok.pad_token = tok.eos_token
@@ -134,9 +127,6 @@ def wrap_with_lora(model):
     return model
 
 
-# --------------------------
-# Training entry
-# --------------------------
 def main_train(train_json: str):
     base, tok = load_base_model_and_tokenizer()
     base = wrap_with_lora(base)
